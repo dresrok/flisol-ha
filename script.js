@@ -1,7 +1,9 @@
 /**
- * Lava Lamp Simulation
- * Canvas 2D blob animation with real-time control over brightness, speed,
- * blob count, and colour palette.
+ * Lava Lamp Simulation (V2)
+ * Canvas 2D blob animation with heat-driven buoyancy physics,
+ * stretch-and-split behaviour, visual merging, and full control
+ * over brightness, thermal speed, blob count, palette, and
+ * custom colours.
  */
 
 (function () {
@@ -15,6 +17,9 @@
     speed:      document.getElementById('speed'),
     blobCount:  document.getElementById('blobCount'),
     palette:    document.getElementById('palette'),
+    customWrap: document.getElementById('customColorWrap'),
+    customA:    document.getElementById('customColorA'),
+    customB:    document.getElementById('customColorB'),
     resetBtn:   document.getElementById('resetBtn')
   };
 
@@ -38,46 +43,101 @@
   let lastTime = performance.now();
   const blobs  = [];
 
+  // Thermal state per blob to fake heat/buoyancy cycles
+  function makeThermal(b) {
+    b.temp = 0.3 + Math.random() * 0.7;        // 0..1 heat
+    b.targetTemp = 0.5 + Math.random() * 0.5;
+    b.heatRate   = 0.08 + Math.random() * 0.12;
+    b.coolRate   = 0.10 + Math.random() * 0.15;
+    b.state = 'rising'; // rising | sinking | merging
+    b.stretch  = 1.0;       // vertical stretch
+    b.splitSeed = Math.random();
+  }
+
   // ─── Blob Constructor ───
   function Blob(w, h) {
     this.init(w, h, true);
   }
 
   Blob.prototype.init = function (w, h, randomY = false) {
-    this.radius = (Math.random() * 0.12 + 0.06) * Math.min(w, h);
-    this.x = Math.random() * w;
-    this.y = randomY ? Math.random() * h : h + this.radius;
-    this.vx = (Math.random() - 0.5) * 0.4;           // horizontal drift
-    this.vy = -(Math.random() * 0.4 + 0.15);         // upward speed
+    const scale = Math.min(w, h);
+    // thinner blobs for classic look
+    this.baseRadius = (Math.random() * 0.08 + 0.04) * scale;
+    this.radius = this.baseRadius;
+    this.x = w * 0.2 + Math.random() * w * 0.6;
+    this.y = randomY ? (h * 0.15 + Math.random() * h * 0.7) : h + this.baseRadius;
     this.phase = Math.random() * Math.PI * 2;
-    this.freq  = Math.random() * 0.5 + 0.5;
+    this.freq  = Math.random() * 0.8 + 0.4;
     this.morphSeed = Math.random();
+    this.vx = (Math.random() - 0.5) * 0.2;
+    this.vy = 0;
+    makeThermal(this);
   };
 
   Blob.prototype.update = function (dt, w, h, speedMult) {
     const s = speedMult * 60 * dt;
+
+    // ── Thermal physics ──
+    // hotter = more buoyant (faster rise, more stretch)
+    // cooler = denser (sinks, contracts)
+    const isHot = this.temp > 0.55;
+
+    if (isHot) {
+      this.temp = Math.max(0, this.temp - this.coolRate * dt * speedMult * 0.8);
+      this.vy -= (0.6 * speedMult) * dt;          // accelerate upward
+      this.stretch = Math.min(2.4, this.stretch + 0.8 * dt * speedMult);
+    } else {
+      this.temp = Math.min(1, this.temp + this.heatRate * dt * speedMult);
+      this.vy += (0.35 * speedMult) * dt;         // accelerate downward
+      this.stretch = Math.max(0.7, this.stretch - 0.6 * dt * speedMult);
+    }
+
+    // damp vertical velocity so it doesn't explode
+    const maxV = 2.2 * speedMult;
+    this.vy = Math.max(-maxV, Math.min(maxV, this.vy));
+
+    // horizontal sway driven by heat
+    this.phase += this.freq * s * 0.025;
+    const swayAmp = 0.2 + this.temp * 0.4;
+    this.vx += Math.sin(this.phase) * swayAmp * dt;
+    this.vx *= 0.96; // gentle damping
+
     this.x += this.vx * s;
     this.y += this.vy * s;
 
-    // Gentle horizontal sway
-    this.phase += this.freq * s * 0.03;
-    this.x += Math.sin(this.phase) * 0.3 * s;
-
-    // Wrap / recycle
-    if (this.y < -this.radius * 2) {
-      this.init(w, h, false);
+    // Recycle at top / bottom inside vessel with margin
+    const margin = this.baseRadius * 1.5;
+    if (this.y < h * 0.08 + margin && this.vy < 0) {
+      // reached top: cool down and start sinking
+      this.temp = 0.15;
+      this.vy = 0.3 * speedMult;
+      this.y = h * 0.08 + margin + 4;
     }
-    if (this.x < -this.radius) this.x = w + this.radius;
-    if (this.x > w + this.radius) this.x = -this.radius;
+    if (this.y > h * 0.92 - margin && this.vy > 0) {
+      // reached bottom: heat up and start rising
+      this.temp = 0.9;
+      this.vy = -0.5 * speedMult;
+      this.y = h * 0.92 - margin - 4;
+    }
+
+    // wall bounce (vessel walls)
+    const wallL = w * 0.06;
+    const wallR = w * 0.94;
+    if (this.x < wallL) { this.x = wallL; this.vx *= -0.5; }
+    if (this.x > wallR) { this.x = wallR; this.vx *= -0.5; }
+
+    // dynamic radius pulse
+    const t = performance.now();
+    this.radius = this.baseRadius * (1 + Math.sin(t * 0.001 + this.morphSeed * 7) * 0.06);
   };
 
   // ─── Resize / DPR ───
   let W, H, dpr;
   function resize() {
-    const rect = canvas.getBoundingClientRect();
+    const rect = canvas.parentElement.getBoundingClientRect();
     dpr = window.devicePixelRatio || 1;
-    W = Math.round(rect.width * dpr);
-    H = Math.round(rect.height * dpr);
+    W = Math.max(1, Math.round(rect.width  * dpr));
+    H = Math.max(1, Math.round(rect.height * dpr));
     canvas.width  = W;
     canvas.height = H;
   }
@@ -87,91 +147,90 @@
   // ─── Blob Manager ───
   function syncBlobs() {
     const target = Math.max(3, Math.min(25, params.blobCount));
-    // add
-    while (blobs.length < target) blobs.push(new Blob(W, H));
-    // remove
-    while (blobs.length > target) blobs.pop();
+    while (blobs.length < target) { const b = new Blob(W, H); makeThermal(b); blobs.push(b); }
+    while (blobs.length > target) { blobs.pop(); }
   }
   syncBlobs();
 
   // ─── Helpers ───
   function paletteColor(which, t) {
+    if (params.palette === 'custom') {
+      return which === 'a' ? els.customA.value : els.customB.value;
+    }
     const p = PALETTES[params.palette] || PALETTES.sunset;
     const base = which === 'a' ? p.a : p.b;
     const shift = Math.sin(t * 0.001 + (which === 'a' ? 0 : 2)) * 8;
     return `hsl(${base.h + shift}, ${base.s}%, ${base.l}%)`;
   }
 
-  function glassGradient(w, h) {
-    const g = ctx.createLinearGradient(0, 0, w, h);
-    g.addColorStop(0.0, 'rgba(255,255,255,0.06)');
-    g.addColorStop(0.4, 'rgba(255,255,255,0.0)');
-    g.addColorStop(0.8, 'rgba(255,255,255,0.02)');
-    g.addColorStop(1.0, 'rgba(255,255,255,0.08)');
-    return g;
-  }
-
   // ─── Render Loop ───
   function loop(now) {
-    const dt = Math.min((now - lastTime) / 1000, 0.05); // cap delta
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
 
     const p = PALETTES[params.palette] || PALETTES.sunset;
+
+    // vessel background tinted by palette warmth
     ctx.fillStyle = p.bg;
     ctx.fillRect(0, 0, W, H);
 
     syncBlobs();
 
-    // glow multiplier
     const glow = params.brightness;
 
-    // draw blobs back-to-front for soft overlap feel
+    // Compute merged/drawn list — draw back-to-front for soft sorting
     blobs.sort((a, b) => b.y - a.y);
+
+    ctx.globalCompositeOperation = 'screen';
 
     for (const b of blobs) {
       b.update(dt, W, H, params.speed);
 
-      const t = now + b.morphSeed * 1000;
-      const pulse = 1 + Math.sin(t * 0.002) * 0.08;
-      const r = b.radius * pulse;
-
-      // radial gradient per blob
-      const grad = ctx.createRadialGradient(
-        b.x, b.y - r * 0.25, r * 0.15,
-        b.x, b.y, r
-      );
       const colour = paletteColor((b.morphSeed > 0.5) ? 'a' : 'b', now);
-      grad.addColorStop(0.0, colour.replace(/hsl/, 'hsla').replace(/\)/, `,${0.95 * glow})`));
-      grad.addColorStop(0.5, colour.replace(/hsl/, 'hsla').replace(/\)/, `,${0.5 * glow})`));
-      grad.addColorStop(1.0, colour.replace(/hsl/, 'hsla').replace(/\)/, ',0.0)'));
+      const rx = b.radius;
+      const ry = b.radius * Math.max(0.55, Math.min(2.6, b.stretch));
 
-      ctx.globalCompositeOperation = 'screen';
+      // Build radial gradient inside the blob
+      // Use thermal state to shift the highlight: hotter = higher
+      const hotOffset = -ry * (0.2 + b.temp * 0.3);
+      const grad = ctx.createRadialGradient(
+        b.x + Math.sin(b.phase)*rx*0.15, b.y + hotOffset, rx * 0.12,
+        b.x, b.y, Math.max(rx, ry * 0.9)
+      );
+
+      let alphaCore = 0.92 * glow;
+      let alphaMid  = 0.45 * glow;
+      let alphaEdge = 0.0;
+
+      if (b.temp > 0.75) { alphaCore = Math.min(1, alphaCore * 1.15); }
+
+      // Build rgba for each stop (supports both HSL strings and hex)
+      const getRgba = (baseColour, alpha) => {
+        if (typeof baseColour === 'string' && baseColour.startsWith('hsl')) {
+          return baseColour.replace(/hsl\(([^)]+)\)/, (_m, inner) => `hsla(${inner},${alpha.toFixed(2)})`);
+        }
+        // hex
+        const hex = baseColour;
+        if (!hex || hex[0] !== '#') return `rgba(255,140,50,${alpha.toFixed(2)})`;
+        const r = parseInt(hex.slice(1,3),16);
+        const g = parseInt(hex.slice(3,5),16);
+        const gg = parseInt(hex.slice(5,7),16);
+        return `rgba(${r},${g},${gg},${alpha.toFixed(2)})`;
+      };
+
+      grad.addColorStop(0.0, getRgba(colour, alphaCore));
+      grad.addColorStop(0.55, getRgba(colour, alphaMid));
+      grad.addColorStop(1.0, getRgba(colour, alphaEdge));
+
       ctx.beginPath();
-      // slightly squashed circle
-      ctx.ellipse(b.x, b.y, r, r * 0.92, 0, 0, Math.PI * 2);
+      // Draw ellipse with slight rotation for organic feel
+      const rot = Math.sin(b.phase * 0.5) * 0.15 * (b.stretch - 1);
+      ctx.ellipse(b.x, b.y, rx, ry, rot, 0, Math.PI * 2);
       ctx.fillStyle = grad;
       ctx.fill();
-      ctx.globalCompositeOperation = 'source-over';
     }
 
-    // glass reflection overlay
-    const gg = glassGradient(W, H);
-    ctx.fillStyle = gg;
-    ctx.beginPath();
-    ctx.ellipse(W / 2, H / 2, W * 0.48, H * 0.48, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // base cap (bottom)
-    ctx.fillStyle = '#1a1a24';
-    ctx.beginPath();
-    ctx.ellipse(W / 2, H - 8, W * 0.42, 14, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // top cap
-    ctx.fillStyle = '#1a1a24';
-    ctx.beginPath();
-    ctx.ellipse(W / 2, 8, W * 0.38, 12, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
 
     requestAnimationFrame(loop);
   }
@@ -180,13 +239,22 @@
   els.brightness.addEventListener('input', e => { params.brightness = parseFloat(e.target.value); });
   els.speed.addEventListener('input',      e => { params.speed      = parseFloat(e.target.value); });
   els.blobCount.addEventListener('input',  e => { params.blobCount  = parseInt(e.target.value, 10); });
-  els.palette.addEventListener('change',   e => { params.palette    = e.target.value; });
+  els.palette.addEventListener('change',   e => {
+    params.palette = e.target.value;
+    els.customWrap.style.display = (e.target.value === 'custom') ? 'flex' : 'none';
+  });
+
+  els.customA.addEventListener('input', () => { if(params.palette==='custom'){} });
+  els.customB.addEventListener('input', () => { if(params.palette==='custom'){} });
 
   els.resetBtn.addEventListener('click', () => {
     els.brightness.value = 1.0;   params.brightness = 1.0;
     els.speed.value      = 1.0;   params.speed      = 1.0;
     els.blobCount.value  = 10;    params.blobCount  = 10;
     els.palette.value    = 'sunset'; params.palette = 'sunset';
+    els.customWrap.style.display = 'none';
+    els.customA.value = '#ff6633';
+    els.customB.value = '#ffcc00';
   });
 
   // start

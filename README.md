@@ -1,16 +1,19 @@
-# Lava Lamp Experience
+# Lava Lamp Experience — V2 (by kimi-k2.6)
 
 A fully interactive, canvas-based lava lamp simulation meant to run anywhere — open locally or publish via GitHub Pages.
 
+## What's New in V2
+
+- **Classic lava lamp silhouette** — iconic thin vessel with chrome top and base
+- **Heat-driven physics** — blobs rise when hot, cool, then sink; stretch and deform as they move
+- **Custom colours** — built-in palette presets plus a native colour picker for your own combos
+- **More responsive layout** across desktop and mobile
+
 ---
-
-## What is this?
-
-A single-page web experience that recreates the aesthetic of a classic lava lamp using HTML5 Canvas. Blobs rise, fall, and morph inside a glass vessel with soft glows, glass reflections, and real-time controls.
 
 ## Quick Start
 
-1. Clone or download this repository.
+1. Clone or download this repository to your machine.
 2. Open `index.html` directly in any modern browser (Chrome, Firefox, Safari, Edge).
 3. No build tools, no installation, no server required.
 
@@ -29,24 +32,25 @@ Live URL will look like: `https://dresrok.github.io/flisol-ha/`
 | Control | Description |
 |---|---|
 | **Brightness / Glow** | Adjusts the intensity of the blob glow |
-| **Animation Speed** | Multiplier for blob movement |
+| **Heat / Convection Speed** | Thermal cycle intensity — higher = faster heat/cool and more energetic rising/sinking |
 | **Blob Count** | Number of blobs inside the lamp (3–25) |
-| **Color Palette** | Switch between Sunset, Ocean, Forest, Berry, Gold presets |
+| **Color Palette** | Switch between Sunset, Ocean, Forest, Berry, Gold presets, or choose **Custom…** |
+| **Custom Colors** (when Custom selected) | Choose your own primary and secondary blob colours |
 | **Restore Defaults** | Resets all controls to factory settings |
 
 ## File Structure
 
 | File | Purpose |
 |---|---|
-| `index.html` | Main page structure and layout |
-| `styles.css` | Responsive styles, glass morphism UI, and lamp shape |
-| `script.js` | Canvas rendering engine, blob physics, and controls wiring |
+| `index.html` | Main page structure, lamp hardware chrome, and layout |
+| `styles.css` | Responsive styles, glass morphism UI, classic lamp silhouette |
+| `script.js` | Canvas rendering engine, heat/buoyancy physics, blob merging/stretching, controls |
 | `README.md` | This file |
 
 ## Design Notes
 
 - Uses **Canvas 2D** with `screen` compositing for soft additive glow.
-- Blobs are procedural — they spawn, rise, sway, and recycle continuously.
+- Blobs model simple thermal states: heat at the bottom → rise and stretch → cool at the top → sink and contract.
 - Responsive layout switches from side-by-side (desktop) to stacked (mobile).
 - All paths are relative so it works on any host, including GitHub Pages.
 - Zero external dependencies — no CDNs, no build step.
