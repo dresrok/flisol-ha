@@ -10,7 +10,7 @@ A single-page web experience that recreates the aesthetic of a classic lava lamp
 
 ## Quick Start
 
-1. Clone or download this repository.
+1. Clone or download this repository to your machine.
 2. Open `index.html` directly in any modern browser (Chrome, Firefox, Safari, Edge).
 3. No build tools, no installation, no server required.
 
