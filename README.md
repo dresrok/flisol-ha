@@ -1,4 +1,4 @@
-# Lava Lamp Experience
+# Lava Lamp Experience — by kimi-k2.6
 
 A fully interactive, canvas-based lava lamp simulation meant to run anywhere — open locally or publish via GitHub Pages.
 
