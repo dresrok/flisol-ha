@@ -18,29 +18,179 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at 50% 40%, #181820 0%, #0b0b0f 70%);
+  gap: 3rem;
+  padding: 1rem;
+  background: #0c0c12;
 }
 
-/* The canvas sits in the centre, representing the lamp vessel */
+/* ─── Classic Lava Lamp Assembly ─── */
+.lamp-assembly {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+  filter: drop-shadow(0 0 40px rgba(255, 120, 40, 0.15));
+}
+
+/* ─── Top Cap ─── */
+.lamp-cap {
+  width: clamp(60px, 6vh, 80px);
+  height: clamp(16px, 2.2vh, 24px);
+  position: relative;
+  z-index: 5;
+}
+
+.lamp-cap::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg,
+    #d0d0d0 0%,
+    #f0f0f0 35%,
+    #b0b0b0 60%,
+    #909090 100%
+  );
+  border-radius: 50% 50% 30% 30% / 70% 70% 30% 30%;
+  box-shadow:
+    0 2px 6px rgba(0,0,0,0.4),
+    inset 0 1px 2px rgba(255,255,255,0.7);
+}
+
+.lamp-cap-slit {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 85%;
+  height: 3px;
+  background: rgba(0,0,0,0.35);
+  border-radius: 50%;
+  box-shadow:
+    0 -1px 1px rgba(255,255,255,0.2),
+    0 1px 2px rgba(0,0,0,0.2);
+}
+
+/* ─── Glass Vessel ─── */
+.lamp-vessel-outer {
+  width: clamp(100px, 14vh, 170px);
+  height: clamp(280px, 42vh, 500px);
+  position: relative;
+  z-index: 3;
+}
+
+.lamp-vessel-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #0a0a10;
+  box-shadow:
+    /* Outer glass edge */
+    0 0 0 1px rgba(255,255,255,0.06),
+    0 0 0 2px rgba(255,255,255,0.03),
+    /* Inner dark border */
+    inset 0 0 0 3px rgba(0,0,0,0.4),
+    inset 0 0 20px rgba(0,0,0,0.6),
+    /* Glow from lava */
+    0 0 50px rgba(255,100,30,0.12),
+    0 0 100px rgba(255,80,20,0.06);
+}
+
+/* Glass edge highlight */
+.lamp-vessel-inner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  background:
+    linear-gradient(90deg,
+      rgba(255,255,255,0.08) 0%,
+      transparent 8%,
+      transparent 92%,
+      rgba(255,255,255,0.05) 100%
+    );
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Glass inner glow edge */
+.lamp-vessel-inner::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 2px;
+  background:
+    linear-gradient(90deg,
+      rgba(255,255,255,0.03) 0%,
+      transparent 10%,
+      transparent 90%,
+      rgba(255,255,255,0.02) 100%
+    );
+  pointer-events: none;
+  z-index: 11;
+}
+
 canvas#lampCanvas {
   display: block;
-  width: min(38vh, 70vw);
-  height: min(72vh, 100vw);
-  border-radius: 48% 48% 42% 42% / 50% 50% 46% 46%;
-  background: #050508;
-  box-shadow:
-    0 0 60px rgba(255, 100, 30, 0.25),
-    0 0 120px rgba(255, 80, 20, 0.15),
-    inset 0 0 40px rgba(0, 0, 0, 0.8);
-  z-index: 2;
+  width: 100%;
+  height: 100%;
+}
+
+/* ─── Foot / Base ─── */
+.lamp-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 5;
+}
+
+.lamp-foot-top {
+  width: clamp(90px, 12vh, 150px);
+  height: 14px;
+  background: linear-gradient(180deg,
+    #a0a0a0 0%,
+    #707070 50%,
+    #505050 100%
+  );
+  border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  margin-top: -4px;
+}
+
+.lamp-foot-body {
+  width: clamp(90px, 14vh, 170px);
+  height: clamp(30px, 5vh, 55px);
+  background: #1a1a1e;
+  position: relative;
+  clip-path: polygon(5% 0%, 95% 0%, 100% 100%, 0% 100%);
+  margin-top: -6px;
+}
+
+.lamp-foot-body::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.03) 0%,
+    transparent 20%,
+    transparent 80%,
+    rgba(255,255,255,0.02) 100%
+  );
+}
+
+.lamp-foot-bottom {
+  width: clamp(100px, 16vh, 200px);
+  height: 10px;
+  background: #151518;
+  border-radius: 50%;
+  margin-top: -5px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
 }
 
 /* ─── Controls Panel ─── */
 .controls {
-  position: absolute;
-  right: 2rem;
-  top: 50%;
-  transform: translateY(-50%);
   width: 260px;
   padding: 1.5rem;
   background: rgba(20, 20, 28, 0.85);
@@ -75,6 +225,12 @@ canvas#lampCanvas {
   font-weight: 600;
   color: #b0b0c0;
   letter-spacing: 0.4px;
+}
+
+.control-group .hint {
+  font-size: 0.70rem;
+  color: #808090;
+  font-style: italic;
 }
 
 /* Range inputs */
@@ -156,24 +312,21 @@ select#palette:focus { border-color: #ff914d; }
 .reset-btn:active { transform: translateY(0); }
 
 /* Color picker styling */
-.color-picker-group {
-  opacity: 0;
-  max-height: 0;
-  overflow: hidden;
-  transition: opacity 0.3s ease, max-height 0.3s ease, margin 0.3s ease;
+.color-picker-wrap {
+  display: none;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
-.color-picker-group.visible {
-  opacity: 1;
-  max-height: 100px;
-  margin-top: 0.2rem;
+.color-picker-wrap.visible {
+  display: flex;
 }
 
 input[type="color"] {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 44px;
+  height: 40px;
   border: none;
   border-radius: 8px;
   background: transparent;
@@ -181,15 +334,11 @@ input[type="color"] {
   padding: 2px;
 }
 
-input[type="color"]::-webkit-color-swatch-wrapper {
-  padding: 2px;
-}
-
+input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
 input[type="color"]::-webkit-color-swatch {
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
-
 input[type="color"]::-moz-color-swatch {
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -201,23 +350,37 @@ input[type="color"]::-moz-color-swatch {
     flex-direction: column;
     justify-content: flex-start;
     padding-top: 1rem;
+    gap: 1.2rem;
   }
 
-  canvas#lampCanvas {
-    width: min(42vw, 260px);
-    height: min(78vw, 460px);
+  .lamp-vessel-outer {
+    width: min(40vw, 140px);
+    height: min(60vw, 340px);
+  }
+
+  .lamp-cap {
+    width: min(30vw, 60px);
+    height: 14px;
+  }
+
+  .lamp-foot-top {
+    width: min(32vw, 120px);
+    height: 12px;
+  }
+
+  .lamp-foot-body {
+    width: min(36vw, 140px);
+    height: min(7vw, 40px);
+  }
+
+  .lamp-foot-bottom {
+    width: min(40vw, 160px);
+    height: 8px;
   }
 
   .controls {
-    position: static;
-    transform: none;
-    width: min(92vw, 380px);
-    margin-top: 1.2rem;
+    width: min(92vw, 340px);
     padding: 1.1rem;
     gap: 0.9rem;
-  }
-
-  .color-picker-group input[type="color"] {
-    height: 40px;
   }
 }
