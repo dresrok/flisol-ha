@@ -1,9 +1,6 @@
 /**
- * Lava Lamp Simulation (V2)
- * Canvas 2D blob animation with heat-driven buoyancy physics,
- * stretch-and-split behaviour, visual merging, and full control
- * over brightness, thermal speed, blob count, palette, and
- * custom colours.
+ * Lava Lamp Simulation V2
+ * Canvas 2D with metaball rendering for organic lava shapes
  */
 
 (function () {
@@ -13,132 +10,136 @@
   const canvas  = document.getElementById('lampCanvas');
   const ctx     = canvas.getContext('2d');
   const els = {
-    brightness: document.getElementById('brightness'),
-    speed:      document.getElementById('speed'),
-    blobCount:  document.getElementById('blobCount'),
-    palette:    document.getElementById('palette'),
-    customWrap: document.getElementById('customColorWrap'),
-    customA:    document.getElementById('customColorA'),
-    customB:    document.getElementById('customColorB'),
-    resetBtn:   document.getElementById('resetBtn')
+    brightness:  document.getElementById('brightness'),
+    speed:       document.getElementById('speed'),
+    blobCount:   document.getElementById('blobCount'),
+    palette:     document.getElementById('palette'),
+    customColorA:  document.getElementById('customColorA'),
+    customColorB:  document.getElementById('customColorB'),
+    customColorWrap: document.getElementById('customColorWrap'),
+    resetBtn:    document.getElementById('resetBtn')
   };
 
   // ─── Palette Presets ───
   const PALETTES = {
-    sunset: { a: {h:18, s:90, l:55}, b: {h:35, s:95, l:65}, bg: '#080510' },
-    ocean:  { a: {h:210, s:85, l:55}, b: {h:180, s:90, l:65}, bg: '#050a15' },
-    forest: { a: {h:130, s:80, l:50}, b: {h:90, s:85, l:60},  bg: '#051005' },
-    berry:  { a: {h:280, s:75, l:55}, b: {h:330, s:80, l:65}, bg: '#100510' },
-    gold:   { a: {h:45, s:95, l:55},  b: {h:55, s:90, l:70},  bg: '#111005' }
+    sunset: { a: hsl(18,90,62),  b: hsl(35,95,68),  bg: '#080510' },
+    ocean:  { a: hsl(210,85,60), b: hsl(180,90,65), bg: '#050a15' },
+    forest: { a: hsl(130,80,55), b: hsl(90,85,60),  bg: '#051005' },
+    berry:  { a: hsl(280,75,60), b: hsl(330,80,65), bg: '#100510' },
+    gold:   { a: hsl(45,95,62),  b: hsl(55,90,72),  bg: '#111005' },
+    ivory:  { a: hsl(42,25,85), b: hsl(40,20,92),  bg: '#0a0908' }
   };
+
+  function hsl(h, s, l) {
+    return `hsl(${h}, ${s}%, ${l}%)`;
+  }
+
+  let customPalette = null;
 
   // ─── State ───
   let params = {
-    brightness: parseFloat(els.brightness.value),
-    speed:      parseFloat(els.speed.value),
-    blobCount:  parseInt(els.blobCount.value, 10),
-    palette:    els.palette.value
+    brightness:  parseFloat(els.brightness.value),
+    speed:       parseFloat(els.speed.value),
+    blobCount:   parseInt(els.blobCount.value, 10),
+    palette:     els.palette.value,
+    customColorA: els.customColorA.value,
+    customColorB: els.customColorB.value
   };
 
   let lastTime = performance.now();
   const blobs  = [];
 
-  // Thermal state per blob to fake heat/buoyancy cycles
-  function makeThermal(b) {
-    b.temp = 0.3 + Math.random() * 0.7;        // 0..1 heat
-    b.targetTemp = 0.5 + Math.random() * 0.5;
-    b.heatRate   = 0.08 + Math.random() * 0.12;
-    b.coolRate   = 0.10 + Math.random() * 0.15;
-    b.state = 'rising'; // rising | sinking | merging
-    b.stretch  = 1.0;       // vertical stretch
-    b.splitSeed = Math.random();
-  }
+  // ─── Metaball constants ───
+  const MARGIN_X = 0.06;
+  const MARGIN_Y = 0.05;
+  const BLOB_MIN_R = 0.06;
+  const BLOB_MAX_R = 0.14;
+  const BASE_POOL_HEIGHT = 0.08;
 
-  // ─── Blob Constructor ───
+  // ─── Blob ───
   function Blob(w, h) {
     this.init(w, h, true);
   }
 
-  Blob.prototype.init = function (w, h, randomY = false) {
-    const scale = Math.min(w, h);
-    // thinner blobs for classic look
-    this.baseRadius = (Math.random() * 0.08 + 0.04) * scale;
-    this.radius = this.baseRadius;
-    this.x = w * 0.2 + Math.random() * w * 0.6;
-    this.y = randomY ? (h * 0.15 + Math.random() * h * 0.7) : h + this.baseRadius;
-    this.phase = Math.random() * Math.PI * 2;
-    this.freq  = Math.random() * 0.8 + 0.4;
-    this.morphSeed = Math.random();
-    this.vx = (Math.random() - 0.5) * 0.2;
+  Blob.prototype.init = function (w, h, randomY) {
+    const minDim = Math.min(w, h);
+    this.baseR = (Math.random() * (BLOB_MAX_R - BLOB_MIN_R) + BLOB_MIN_R) * minDim;
+    this.r = this.baseR;
+    this.x = (0.35 + Math.random() * 0.3) * w;
+    this.y = randomY
+      ? (MARGIN_Y + Math.random() * (1 - 2 * MARGIN_Y - BASE_POOL_HEIGHT)) * h
+      : h - (MARGIN_Y + BASE_POOL_HEIGHT * 0.3) * h;
+    this.vx = 0;
     this.vy = 0;
-    makeThermal(this);
+    this.temp = randomY ? Math.random() * 0.5 : 0.2 + Math.random() * 0.3;
+    this.phase = Math.random() * Math.PI * 2;
+    this.freq  = Math.random() * 0.3 + 0.25;
+    this.stretchY = 1.0;
+    this.stretchX = 1.0;
   };
 
   Blob.prototype.update = function (dt, w, h, speedMult) {
-    const s = speedMult * 60 * dt;
+    const s = speedMult;
+    const my = MARGIN_Y * h;
+    const mx = MARGIN_X * w;
+    const innerH = h - 2 * my - (BASE_POOL_HEIGHT * h);
 
-    // ── Thermal physics ──
-    // hotter = more buoyant (faster rise, more stretch)
-    // cooler = denser (sinks, contracts)
-    const isHot = this.temp > 0.55;
+    const normY = Math.max(0, Math.min(1, (this.y - my) / innerH));
+    const target = (1 - normY) * 0.85 + 0.1;
+    this.temp += (target - this.temp) * 0.8 * dt * s;
 
-    if (isHot) {
-      this.temp = Math.max(0, this.temp - this.coolRate * dt * speedMult * 0.8);
-      this.vy -= (0.6 * speedMult) * dt;          // accelerate upward
-      this.stretch = Math.min(2.4, this.stretch + 0.8 * dt * speedMult);
-    } else {
-      this.temp = Math.min(1, this.temp + this.heatRate * dt * speedMult);
-      this.vy += (0.35 * speedMult) * dt;         // accelerate downward
-      this.stretch = Math.max(0.7, this.stretch - 0.6 * dt * speedMult);
-    }
+    const buoyancy = (this.temp - 0.45) * 3.0;
+    this.vy += buoyancy * dt * s;
+    this.vy *= (1 - 0.5 * dt);
 
-    // damp vertical velocity so it doesn't explode
-    const maxV = 2.2 * speedMult;
-    this.vy = Math.max(-maxV, Math.min(maxV, this.vy));
-
-    // horizontal sway driven by heat
-    this.phase += this.freq * s * 0.025;
-    const swayAmp = 0.2 + this.temp * 0.4;
-    this.vx += Math.sin(this.phase) * swayAmp * dt;
-    this.vx *= 0.96; // gentle damping
+    this.phase += this.freq * dt * s;
+    const drift = Math.sin(this.phase) * (0.1 + this.temp * 0.15);
+    this.vx += drift * dt * s;
+    this.vx *= (1 - 0.4 * dt);
 
     this.x += this.vx * s;
     this.y += this.vy * s;
 
-    // Recycle at top / bottom inside vessel with margin
-    const margin = this.baseRadius * 1.5;
-    if (this.y < h * 0.08 + margin && this.vy < 0) {
-      // reached top: cool down and start sinking
-      this.temp = 0.15;
-      this.vy = 0.3 * speedMult;
-      this.y = h * 0.08 + margin + 4;
-    }
-    if (this.y > h * 0.92 - margin && this.vy > 0) {
-      // reached bottom: heat up and start rising
-      this.temp = 0.9;
-      this.vy = -0.5 * speedMult;
-      this.y = h * 0.92 - margin - 4;
+    const velY = Math.abs(this.vy);
+    const ty = 1.0 + velY * 0.35;
+    const tx = 1.0 / Math.sqrt(Math.max(1.05, ty));
+    this.stretchY += (ty - this.stretchY) * 4 * dt;
+    this.stretchX += (tx - this.stretchX) * 4 * dt;
+
+    // Walls
+    if (this.x < mx + this.r)     { this.x = mx + this.r;     this.vx =  Math.abs(this.vx) * 0.3; }
+    if (this.x > w - mx - this.r)  { this.x = w - mx - this.r;  this.vx = -Math.abs(this.vx) * 0.3; }
+
+    // Bottom
+    if (this.y > h - my - this.r) {
+      this.y = h - my - this.r;
+      this.vy = -Math.abs(this.vy) * 0.2;
+      this.temp = Math.min(this.temp + 0.15, 0.85);
     }
 
-    // wall bounce (vessel walls)
-    const wallL = w * 0.06;
-    const wallR = w * 0.94;
-    if (this.x < wallL) { this.x = wallL; this.vx *= -0.5; }
-    if (this.x > wallR) { this.x = wallR; this.vx *= -0.5; }
+    // Top
+    if (this.y < my + this.r * 0.4) {
+      if (this.temp < 0.28) {
+        this.init(w, h, false);
+      } else {
+        this.y = my + this.r * 0.4;
+        this.vy = Math.abs(this.vy) * 0.12;
+        this.temp *= 0.88;
+      }
+    }
 
-    // dynamic radius pulse
-    const t = performance.now();
-    this.radius = this.baseRadius * (1 + Math.sin(t * 0.001 + this.morphSeed * 7) * 0.06);
+    const pulse = 1.0 + (this.temp - 0.5) * 0.08;
+    this.r = this.baseR * pulse;
   };
 
   // ─── Resize / DPR ───
   let W, H, dpr;
   function resize() {
-    const rect = canvas.parentElement.getBoundingClientRect();
-    dpr = window.devicePixelRatio || 1;
-    W = Math.max(1, Math.round(rect.width  * dpr));
-    H = Math.max(1, Math.round(rect.height * dpr));
-    canvas.width  = W;
+    const rect = canvas.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = Math.max(Math.round(rect.width * dpr), 1);
+    H = Math.max(Math.round(rect.height * dpr), 1);
+    canvas.width = W;
     canvas.height = H;
   }
   resize();
@@ -146,117 +147,218 @@
 
   // ─── Blob Manager ───
   function syncBlobs() {
-    const target = Math.max(3, Math.min(25, params.blobCount));
-    while (blobs.length < target) { const b = new Blob(W, H); makeThermal(b); blobs.push(b); }
-    while (blobs.length > target) { blobs.pop(); }
+    const target = Math.max(4, Math.min(20, params.blobCount));
+    while (blobs.length < target) blobs.push(new Blob(W, H));
+    while (blobs.length > target) blobs.pop();
   }
   syncBlobs();
 
-  // ─── Helpers ───
-  function paletteColor(which, t) {
-    if (params.palette === 'custom') {
-      return which === 'a' ? els.customA.value : els.customB.value;
+  // ─── Palette helpers ───
+  function hexToHsl(hex) {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    let h = 0, s = 0, l = (mx + mn) / 2;
+    if (mx !== mn) {
+      const d = mx - mn;
+      s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+      switch (mx) {
+        case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+        case g: h = ((b - r) / d + 2) / 6; break;
+        case b: h = ((r - g) / d + 4) / 6; break;
+      }
     }
-    const p = PALETTES[params.palette] || PALETTES.sunset;
-    const base = which === 'a' ? p.a : p.b;
-    const shift = Math.sin(t * 0.001 + (which === 'a' ? 0 : 2)) * 8;
-    return `hsl(${base.h + shift}, ${base.s}%, ${base.l}%)`;
+    return { h: h * 360, s: s * 100, l: l * 100 };
   }
 
-  // ─── Render Loop ───
+  function buildCustom(aHex, bHex) {
+    const a = hexToHsl(aHex), b = hexToHsl(bHex || aHex);
+    return {
+      a: hsl(a.h,   Math.min(95, a.s + 5),  Math.max(40, a.l)),
+      b: hsl(b.h,   Math.min(95, b.s + 5),  Math.min(72, b.l + 10)),
+      bg: `hsl(${a.h}, ${Math.max(15, a.s * 0.2)}%, ${Math.max(4, a.l * 0.08)}%)`
+    };
+  }
+
+  function palette(which) {
+    const p = (params.palette === 'custom' && customPalette)
+      ? customPalette
+      : (PALETTES[params.palette] || PALETTES.sunset);
+    return which === 'a' ? p.a : p.b;
+  }
+
+  // Extract numeric HSL parts for shading
+  function parseHsl(str) {
+    const m = str.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+    return m ? { h: +m[1], s: +m[2], l: +m[3] } : { h: 25, s: 90, l: 60 };
+  }
+
+  // ─── Render ───
+  let dt;
+
   function loop(now) {
-    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    dt = Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
 
-    const p = PALETTES[params.palette] || PALETTES.sunset;
-
-    // vessel background tinted by palette warmth
+    const p = (params.palette === 'custom' && customPalette)
+      ? customPalette
+      : (PALETTES[params.palette] || PALETTES.sunset);
     ctx.fillStyle = p.bg;
     ctx.fillRect(0, 0, W, H);
 
     syncBlobs();
-
     const glow = params.brightness;
+    const sMult = params.speed;
 
-    // Compute merged/drawn list — draw back-to-front for soft sorting
-    blobs.sort((a, b) => b.y - a.y);
+    for (const b of blobs) b.update(dt, W, H, sMult);
 
-    ctx.globalCompositeOperation = 'screen';
-
-    for (const b of blobs) {
-      b.update(dt, W, H, params.speed);
-
-      const colour = paletteColor((b.morphSeed > 0.5) ? 'a' : 'b', now);
-      const rx = b.radius;
-      const ry = b.radius * Math.max(0.55, Math.min(2.6, b.stretch));
-
-      // Build radial gradient inside the blob
-      // Use thermal state to shift the highlight: hotter = higher
-      const hotOffset = -ry * (0.2 + b.temp * 0.3);
-      const grad = ctx.createRadialGradient(
-        b.x + Math.sin(b.phase)*rx*0.15, b.y + hotOffset, rx * 0.12,
-        b.x, b.y, Math.max(rx, ry * 0.9)
-      );
-
-      let alphaCore = 0.92 * glow;
-      let alphaMid  = 0.45 * glow;
-      let alphaEdge = 0.0;
-
-      if (b.temp > 0.75) { alphaCore = Math.min(1, alphaCore * 1.15); }
-
-      // Build rgba for each stop (supports both HSL strings and hex)
-      const getRgba = (baseColour, alpha) => {
-        if (typeof baseColour === 'string' && baseColour.startsWith('hsl')) {
-          return baseColour.replace(/hsl\(([^)]+)\)/, (_m, inner) => `hsla(${inner},${alpha.toFixed(2)})`);
+    // Attraction pass for organic merging
+    for (let i = 0; i < blobs.length; i++) {
+      for (let j = i + 1; j < blobs.length; j++) {
+        const a = blobs[i], b = blobs[j];
+        const dx = a.x - b.x, dy = a.y - b.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const thr = (a.r + b.r) * 1.3;
+        if (dist < thr && dist > 0.1) {
+          const pull = 0.2 * dt;
+          a.x -= dx * pull * 0.5; a.y -= dy * pull * 0.5;
+          b.x += dx * pull * 0.5; b.y += dy * pull * 0.5;
+          const avg = (a.temp + b.temp) * 0.5;
+          a.temp = avg; b.temp = avg;
         }
-        // hex
-        const hex = baseColour;
-        if (!hex || hex[0] !== '#') return `rgba(255,140,50,${alpha.toFixed(2)})`;
-        const r = parseInt(hex.slice(1,3),16);
-        const g = parseInt(hex.slice(3,5),16);
-        const gg = parseInt(hex.slice(5,7),16);
-        return `rgba(${r},${g},${gg},${alpha.toFixed(2)})`;
-      };
-
-      grad.addColorStop(0.0, getRgba(colour, alphaCore));
-      grad.addColorStop(0.55, getRgba(colour, alphaMid));
-      grad.addColorStop(1.0, getRgba(colour, alphaEdge));
-
-      ctx.beginPath();
-      // Draw ellipse with slight rotation for organic feel
-      const rot = Math.sin(b.phase * 0.5) * 0.15 * (b.stretch - 1);
-      ctx.ellipse(b.x, b.y, rx, ry, rot, 0, Math.PI * 2);
-      ctx.fillStyle = grad;
-      ctx.fill();
+      }
     }
 
-    ctx.globalCompositeOperation = 'source-over';
+    blobs.sort((a, b) => b.y - a.y);
+
+    // ─── Draw each blob as a metaball with internal glow ───
+    for (const b of blobs) {
+      const colA = parseHsl(palette('a'));
+      const colB = parseHsl(palette('b'));
+      const color = b.morphSeed > 0.5
+        ? `hsl(${colA.h}, ${colA.s}%, ${colA.l}%)`
+        : `hsl(${colB.h}, ${colB.s}%, ${colB.l}%)`;
+      const hot = b.temp > 0.55;
+
+      // Outer glow
+      const og = ctx.createRadialGradient(
+        b.x, b.y, 0,
+        b.x, b.y, b.r * b.stretchX * 2.2
+      );
+      og.addColorStop(0.0, color.replace('hsl', 'hsla').replace(')', `,${0.45 * glow})`));
+      og.addColorStop(0.5, color.replace('hsl', 'hsla').replace(')', `,${0.12 * glow})`));
+      og.addColorStop(1.0, color.replace('hsl', 'hsla').replace(')', ',0.0)'));
+
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = og;
+      ctx.beginPath();
+      ctx.ellipse(b.x, b.y, b.r * b.stretchX * 2.2, b.r * b.stretchY * 2.0, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+
+      // Blob core (solid colour)
+      const cg = ctx.createRadialGradient(
+        b.x, b.y - b.r * 0.15, 0,
+        b.x, b.y, b.r
+      );
+      const alpha1 = (hot ? 0.95 : 0.9) * glow;
+      cg.addColorStop(0.0, color.replace('hsl', 'hsla').replace(')', `,${alpha1})`));
+      cg.addColorStop(0.55, color.replace('hsl', 'hsla').replace(')', `,${0.5 * glow})`));
+      cg.addColorStop(1.0, color.replace('hsl', 'hsla').replace(')', `,${0.15 * glow})`));
+
+      ctx.fillStyle = cg;
+      ctx.beginPath();
+      ctx.ellipse(
+        b.x, b.y,
+        b.r * b.stretchX,
+        b.r * b.stretchY,
+        b.vx * 0.1,
+        0, Math.PI * 2
+      );
+      ctx.fill();
+
+      // Hot bright core
+      if (hot) {
+        ctx.fillStyle = color.replace('hsl', 'hsla').replace(')', `,${0.35 * glow})`);
+        ctx.beginPath();
+        ctx.ellipse(b.x, b.y - b.r * 0.1, b.r * 0.3, b.r * 0.25, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // ─── Base Pool of lava at the bottom ───
+    const col = parseHsl(palette('a'));
+    const poolH = BASE_POOL_HEIGHT * H;
+    const poolGrad = ctx.createLinearGradient(0, H - poolH * 1.5, 0, H);
+    poolGrad.addColorStop(0.0, `hsla(${col.h}, ${col.s}%, ${col.l - 10}%, ${0.0})`);
+    poolGrad.addColorStop(0.4, `hsla(${col.h}, ${col.s}%, ${col.l - 5}%, ${0.3 * glow})`);
+    poolGrad.addColorStop(0.7, `hsla(${col.h}, ${col.s}%, ${col.l}%, ${0.7 * glow})`);
+    poolGrad.addColorStop(1.0, `hsla(${col.h}, ${col.s}%, ${col.l + 5}%, ${0.9 * glow})`);
+
+    ctx.fillStyle = poolGrad;
+    ctx.fillRect(MARGIN_X * W, H - poolH, W - 2 * MARGIN_X * W, poolH);
+
+    // Pool top edge
+    ctx.strokeStyle = `hsla(${col.h}, ${col.s}%, ${col.l + 15}%, ${0.5 * glow})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(MARGIN_X * W, H - poolH);
+    ctx.lineTo(W - MARGIN_X * W, H - poolH);
+    ctx.stroke();
+
+    // ─── Glass edge glow ───
+    const edge = ctx.createLinearGradient(0, 0, W, 0);
+    edge.addColorStop(0.0, 'rgba(255,255,255,0.05)');
+    edge.addColorStop(0.06, 'rgba(255,255,255,0.01)');
+    edge.addColorStop(0.94, 'rgba(255,255,255,0.01)');
+    edge.addColorStop(1.0, 'rgba(255,255,255,0.04)');
+    ctx.fillStyle = edge;
+    ctx.fillRect(0, 0, W, H);
+
+    // Side highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.025)';
+    ctx.beginPath();
+    ctx.ellipse(W * 0.32, H * 0.38, W * 0.04, H * 0.14, -0.18, 0, Math.PI * 2);
+    ctx.fill();
 
     requestAnimationFrame(loop);
   }
 
-  // ─── UI Listeners ───
+  // ─── UI wiring ───
   els.brightness.addEventListener('input', e => { params.brightness = parseFloat(e.target.value); });
-  els.speed.addEventListener('input',      e => { params.speed      = parseFloat(e.target.value); });
-  els.blobCount.addEventListener('input',  e => { params.blobCount  = parseInt(e.target.value, 10); });
-  els.palette.addEventListener('change',   e => {
-    params.palette = e.target.value;
-    els.customWrap.style.display = (e.target.value === 'custom') ? 'flex' : 'none';
-  });
+  els.speed.addEventListener('input', e => { params.speed = parseFloat(e.target.value); });
+  els.blobCount.addEventListener('input', e => { params.blobCount = parseInt(e.target.value, 10); });
 
-  els.customA.addEventListener('input', () => { if(params.palette==='custom'){} });
-  els.customB.addEventListener('input', () => { if(params.palette==='custom'){} });
+  els.palette.addEventListener('change', e => {
+    params.palette = e.target.value;
+    if (params.palette === 'custom') {
+      customPalette = buildCustom(params.customColorA, params.customColorB);
+      els.customColorWrap.classList.add('visible');
+    } else {
+      els.customColorWrap.classList.remove('visible');
+      customPalette = null;
+    }
+  });
+  els.customColorA.addEventListener('input', e => {
+    params.customColorA = e.target.value;
+    if (params.palette === 'custom') customPalette = buildCustom(params.customColorA, params.customColorB);
+  });
+  els.customColorB.addEventListener('input', e => {
+    params.customColorB = e.target.value;
+    if (params.palette === 'custom') customPalette = buildCustom(params.customColorA, params.customColorB);
+  });
 
   els.resetBtn.addEventListener('click', () => {
-    els.brightness.value = 1.0;   params.brightness = 1.0;
-    els.speed.value      = 1.0;   params.speed      = 1.0;
-    els.blobCount.value  = 10;    params.blobCount  = 10;
-    els.palette.value    = 'sunset'; params.palette = 'sunset';
-    els.customWrap.style.display = 'none';
-    els.customA.value = '#ff6633';
-    els.customB.value = '#ffcc00';
+    els.brightness.value    = 1.2;    params.brightness    = 1.2;
+    els.speed.value         = 1.0;    params.speed         = 1.0;
+    els.blobCount.value      = 10;    params.blobCount      = 10;
+    els.palette.value        = 'sunset'; params.palette   = 'sunset';
+    els.customColorA.value  = '#ff6633'; params.customColorA = '#ff6633';
+    els.customColorB.value  = '#ffcc00'; params.customColorB = '#ffcc00';
+    els.customColorWrap.classList.remove('visible');
+    customPalette = null;
   });
 
-  // start
   requestAnimationFrame(loop);
 })();

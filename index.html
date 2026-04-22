@@ -8,52 +8,64 @@
 </head>
 <body>
   <div class="scene">
-    <!-- Classic lava lamp chrome hardware -->
-    <div class="lamp" id="lamp">
-      <div class="lamp-top"></div>
-      <div class="lamp-vessel-wrap">
-        <canvas id="lampCanvas"></canvas>
-        <div class="lamp-glass"></div>
+    <div class="lamp-assembly">
+      <!-- Tapa superior chrome -->
+      <div class="lamp-cap">
+        <div class="lamp-cap-slit"></div>
       </div>
-      <div class="lamp-base"></div>
+
+      <!-- Recipiente de vidrio -->
+      <div class="lamp-vessel-outer">
+        <div class="lamp-vessel-inner">
+          <canvas id="lampCanvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Base inferior trapezoidal -->
+      <div class="lamp-foot">
+        <div class="lamp-foot-top"></div>
+        <div class="lamp-foot-body"></div>
+        <div class="lamp-foot-bottom"></div>
+      </div>
     </div>
 
-    <!-- Controls Panel -->
+    <!-- Panel de controles -->
     <div class="controls" id="controls">
       <h2>Lava Controls</h2>
 
       <div class="control-group">
         <label for="brightness">Brightness / Glow</label>
-        <input type="range" id="brightness" min="0.3" max="2.5" step="0.05" value="1.0" />
+        <input type="range" id="brightness" min="0.3" max="2.5" step="0.05" value="1.2" />
       </div>
 
       <div class="control-group">
-        <label for="speed">Heat / Convection Speed</label>
-        <input type="range" id="speed" min="0.2" max="3.0" step="0.1" value="1.0" />
-        <span class="hint">Higher = more energetic thermal cycling</span>
+        <label for="speed">Heat / Flow Speed</label>
+        <input type="range" id="speed" min="0.3" max="2.5" step="0.1" value="1.0" />
+        <span class="hint">Higher = more energetic convection</span>
       </div>
 
       <div class="control-group">
         <label for="blobCount">Blob Count</label>
-        <input type="range" id="blobCount" min="3" max="25" step="1" value="10" />
+        <input type="range" id="blobCount" min="4" max="20" step="1" value="10" />
       </div>
 
       <div class="control-group">
-        <label for="palette">Color Palette</label>
+        <label for="palette">Color</label>
         <select id="palette">
           <option value="sunset">Sunset</option>
           <option value="ocean">Ocean</option>
           <option value="forest">Forest</option>
           <option value="berry">Berry</option>
           <option value="gold">Gold</option>
+          <option value="ivory">Lunar Ivory</option>
           <option value="custom">Custom…</option>
         </select>
       </div>
 
-      <div class="control-group color-picker-wrap" id="customColorWrap" style="display:none">
-        <label for="customColorA">Primary Color</label>
+      <div class="control-group color-picker-wrap" id="customColorWrap">
+        <label for="customColorA">Primary</label>
         <input type="color" id="customColorA" value="#ff6633" />
-        <label for="customColorB">Secondary Color</label>
+        <label for="customColorB">Secondary</label>
         <input type="color" id="customColorB" value="#ffcc00" />
       </div>
 
