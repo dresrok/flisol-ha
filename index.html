@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lava Lamp Experience</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="scene">
+    <canvas id="lampCanvas"></canvas>
+
+    <div class="controls" id="controls">
+      <h2>Lava Controls</h2>
+
+      <div class="control-group">
+        <label for="brightness">Brightness / Glow</label>
+        <input type="range" id="brightness" min="0.3" max="2.0" step="0.05" value="1.0" />
+      </div>
+
+      <div class="control-group">
+        <label for="speed">Animation Speed</label>
+        <input type="range" id="speed" min="0.2" max="3.0" step="0.1" value="1.0" />
+      </div>
+
+      <div class="control-group">
+        <label for="blobCount">Blob Count</label>
+        <input type="range" id="blobCount" min="3" max="25" step="1" value="10" />
+      </div>
+
+      <div class="control-group">
+        <label for="palette">Color Palette</label>
+        <select id="palette">
+          <option value="sunset">Sunset (Red / Orange)</option>
+          <option value="ocean">Ocean (Blue / Cyan)</option>
+          <option value="forest">Forest (Green / Lime)</option>
+          <option value="berry">Berry (Purple / Pink)</option>
+          <option value="gold">Gold (Yellow / Amber)</option>
+        </select>
+      </div>
+
+      <button id="resetBtn" class="reset-btn" type="button">Restore Defaults</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
